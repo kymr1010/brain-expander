@@ -15,10 +15,12 @@ import { Dimmension } from "../schema/Point.js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { useResize } from "../hooks/useResize.js";
-import { CSSProperties } from "@macaron-css/core";
+import { CSSProperties, style } from "@macaron-css/core";
 import { MenuItem, useContextMenu } from "../hooks/useContextMenu.js";
 import { Portal } from "solid-js/web";
-import { updateCard } from "../hooks/useAPI.js";
+import { updateCard } from "../hooks/useCardAPI.js";
+import { EditorPanel } from "../EditorPanel/EditorPanel.jsx";
+import { TagInput } from "../Tag/Tag.jsx";
 
 export const Card = (props: {
   card: CardProps;
@@ -26,18 +28,12 @@ export const Card = (props: {
 }) => {
   let ref!: HTMLDivElement;
 
-  // 1) 位置・サイズシグナル（既存）
   const [pos, setPos] = createSignal<Dimmension>({ ...props.card.position });
   const [size, setSize] = createSignal<Dimmension>({ ...props.card.size });
-
-  // 2) 編集用 title/contents のローカルシグナル
   const [title, setTitle] = createSignal(props.card.title);
+  const [tags, setTags] = createSignal(props.card.tag_ids);
   const [contents, setContents] = createSignal(props.card.contents);
-
-  // 3) 編集モードの開閉フラグ
   const [isEditing, setIsEditing] = createSignal(false);
-
-  // 4) コンテキストメニュー
   const menuItems: MenuItem[] = [
     { label: "コピー", action: () => console.log("コピーしました") },
     {
@@ -49,8 +45,6 @@ export const Card = (props: {
     { label: "削除", action: () => console.log("削除しました") },
   ];
   const { onContextMenu, ContextMenu } = useContextMenu(menuItems);
-
-  // 5) リサイズハンドル準備
   const dirs = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
   const handles = {} as Record<(typeof dirs)[number], HTMLDivElement>;
 
@@ -87,7 +81,6 @@ export const Card = (props: {
 
   return (
     <>
-      {/* カード本体 */}
       <StyledCard
         onContextMenu={onContextMenu}
         onPointerDown={(e) => {
@@ -101,25 +94,30 @@ export const Card = (props: {
           height: `${size().y}px`,
         }}
       >
-        <div ref={ref} style={{ width: "100%", height: "1rem" }}></div>
-        <div>
-          <h1>{title()}</h1>
-          <p>
-            x:{pos().x}, y:{pos().y}
-          </p>
-          <div innerHTML={DOMPurify.sanitize(marked(contents())) || ""}></div>
-        </div>
-        {dirs.map((dir) => (
-          <div
-            ref={(el) => (handles[dir] = el!)}
-            class="resize-handle"
-            style={getHandleStyle(dir, size())}
-          />
-        ))}
-        <ContextMenu />
+        <StyledCardHeader ref={ref}></StyledCardHeader>
+        <StyledCardContent>
+          <div>
+            <h1>{title()}</h1>
+            <p>
+              x:{pos().x}, y:{pos().y}
+            </p>
+            <div class={style({ overflowX: "auto" })}>
+              <TagInput />
+            </div>
+            <div innerHTML={DOMPurify.sanitize(marked(contents())) || ""}></div>
+          </div>
+          {dirs.map((dir) => (
+            <div
+              ref={(el) => (handles[dir] = el!)}
+              class="resize-handle"
+              style={getHandleStyle(dir, size())}
+            />
+          ))}
+        </StyledCardContent>
       </StyledCard>
 
       <Portal>
+        <ContextMenu />
         <Show when={isEditing()}>
           <EditorPanel
             initialTitle={title()}
@@ -136,71 +134,6 @@ export const Card = (props: {
     </>
   );
 };
-
-// カード編集用パネルコンポーネント
-type EditorPanelProps = {
-  initialTitle: string;
-  initialContents: string;
-  onChangeTitle: (v: string) => void;
-  onChangeContents: (v: string) => void;
-  onSave: () => void;
-};
-
-const EditorPanel = (props: EditorPanelProps) => {
-  const [localTitle, setLocalTitle] = createSignal(props.initialTitle);
-  const [localContents, setLocalContents] = createSignal(props.initialContents);
-
-  // ローカル入力を反映
-  createEffect(() => props.onChangeTitle(localTitle()));
-  createEffect(() => props.onChangeContents(localContents()));
-
-  return (
-    <StyledPanel>
-      <h2>カードを編集</h2>
-      <label>
-        タイトル
-        <input
-          type="text"
-          value={localTitle()}
-          onInput={(e) => setLocalTitle(e.currentTarget.value)}
-          style={{ width: "100%", "margin-bottom": "1rem" }}
-        />
-      </label>
-      <label>
-        コンテンツ (Markdown)
-        <textarea
-          value={localContents()}
-          onInput={(e) => setLocalContents(e.currentTarget.value)}
-          style={{
-            width: "100%",
-            height: "40vh",
-            "margin-bottom": "1rem",
-            "font-family": "monospace",
-          }}
-        />
-      </label>
-      <button onClick={props.onSave}>Save</button>
-    </StyledPanel>
-  );
-};
-
-const StyledPanel = styled("div", {
-  base: {
-    position: "fixed",
-    top: 0,
-    right: 0, // 右半分に出したい場合は right: 0; width: 50vw
-    width: "50vw",
-    height: "100vh",
-    padding: "1rem",
-    background: "white",
-    boxShadow: "-4px 0 8px rgba(0,0,0,0.2)",
-    overflow: "auto",
-    zIndex: 2000,
-    transition: "all 0.3s ease-in-out",
-  },
-});
-
-// ============== 以下既存コード ===============
 
 const getHandleStyle = (direction: string, size: Dimmension): CSSProperties => {
   const half = 0;
@@ -281,10 +214,28 @@ const StyledCard = styled("div", {
     padding: "0.75rem",
     overflow: "hidden",
     touchAction: "none",
-
+    userSelect: "none",
+    display: "flex",
+    flexDirection: "column",
     "& li": {
       listStyle: "disc",
       marginLeft: "1rem",
     },
+  },
+});
+
+const StyledCardHeader = styled("div", {
+  base: {
+    width: "100%",
+    height: "1rem",
+  },
+});
+
+const StyledCardContent = styled("div", {
+  base: {
+    overflow: "hidden",
+    width: "100%",
+    height: "100%",
+    flexGrow: 1,
   },
 });

@@ -6,11 +6,12 @@ import { Dimmension } from "../schema/Point.js";
 import { useDrag } from "../hooks/useDrag.js";
 import { style } from "@macaron-css/core";
 import { useContextMenu } from "../hooks/useContextMenu.jsx";
-import { createCard, getCards } from "../hooks/useAPI.js";
+import { createCard, getCards } from "../hooks/useCardAPI.js";
+import { createMutable } from "solid-js/store";
 
 export const CardContainer = (props: { position: Dimmension }) => {
   let ref!: HTMLDivElement;
-  const tileSize = 5000;
+  const tileSize = 2000;
 
   const [mousePosition, setMousePosition] = createSignal<Dimmension>({
     x: 0,
@@ -20,6 +21,7 @@ export const CardContainer = (props: { position: Dimmension }) => {
     x: props.position.x,
     y: props.position.y,
   });
+  const allCards = new Map<number, CardProps>();
   const [tiles, setTiles] = createSignal<Record<string, CardProps[]>>({});
   const [nowTile, setNowTile] = createSignal<string>("0,0");
 
@@ -78,8 +80,16 @@ export const CardContainer = (props: { position: Dimmension }) => {
             .then((r) => r.json() as Promise<CardProps[]>)
             .then((data) => {
               // console.log(data);
-              setTiles((prev) => ({ ...prev, [key]: data }));
-            });
+              const cards: CardProps[] = [];
+              data.forEach((card) => {
+                if (allCards.has(card.id)) return;
+                allCards.set(card.id, card);
+                cards.push(card);
+              });
+
+              setTiles((prev) => ({ ...prev, [key]: cards }));
+            })
+            .catch(console.error);
         }
       });
     })
@@ -130,6 +140,8 @@ export const CardContainer = (props: { position: Dimmension }) => {
       },
       title: "",
       contents: "",
+      tag_ids: [],
+      card_ids: [],
     });
   };
 
@@ -214,8 +226,9 @@ const StyledCardContainer = styled("div", {
     display: "block",
     width: "3840px",
     height: "2160px",
+    backgroundColor: "var(--color-bg, #fff)",
     backgroundImage:
-      `linear-gradient(to right, #eee 1px, transparent 1px),` +
-      `linear-gradient(to bottom, #eee 1px, #fcfcfc 1px)`,
+      `linear-gradient(to right, var(--color-bg-border, #eee) 1px, transparent 1px),` +
+      `linear-gradient(to bottom, var(--color-bg-border, #eee) 1px, transparent 1px)`,
   },
 });

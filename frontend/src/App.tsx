@@ -1,6 +1,27 @@
 import { createSignal, onMount } from "solid-js";
 // import init from "@memo-app/wasm";
 import { CardContainer } from "./CardContainer/CardContainer.jsx";
+import { globalStyle } from "@macaron-css/core";
+
+globalStyle("body", {
+  "--color-bg": "#fff",
+  "--color-bg-border": "#eee",
+});
+
+// globalStyle("body", {
+//   "--color-bg": "#111",
+//   "--color-bg-border": "#0f0",
+// });
+
+globalStyle("body", {
+  fontFamily: `-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
+          Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji" !important;`,
+});
+
+globalStyle("pre, code", {
+  fontFamily: `ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas,
+          Liberation Mono, monospace !important;`,
+});
 
 function App() {
   onMount(async () => {
